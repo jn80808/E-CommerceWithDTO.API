@@ -1,0 +1,9 @@
+﻿@E-CommerceWithDTO.API_HostAddress = https://localhost:7228
+
+GET {{E-CommerceWithDTO.API_HostAddress}}/api/category
+
+###
+
+GET {{E-CommerceWithDTO.API_HostAddress}}/api/category
+
+###
