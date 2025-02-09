@@ -80,38 +80,63 @@ namespace E_Commerce.API.Controllers
 
         // PUT: api/category/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateCategory(int id, UpdateCategoryDto updateCategoryDto)
+        public async Task<ActionResult<object>> UpdateCategory(int id, UpdateCategoryDto updateCategoryDto)
         {
-            var category = await _context.Categories.FindAsync(id);
-            if (category == null)
+            // Validate the ID
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest(new { message = "Invalid category ID." });
             }
 
-            // Manually map properties
+            // Validate input data
+            if (updateCategoryDto == null || string.IsNullOrWhiteSpace(updateCategoryDto.Name))
+            {
+                return BadRequest(new { message = "Invalid category data. Name is required." });
+            }
+
+            var category = await _context.Categories.FindAsync(id);
+
+            // If the category does not exist, return a 404 response
+            if (category == null)
+            {
+                return NotFound(new { message = $"Category with ID {id} not found." });
+            }
+
+            // Update properties
             category.Name = updateCategoryDto.Name;
             category.Description = updateCategoryDto.Description;
 
             _context.Entry(category).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { message = $"Category with ID {id} has been successfully updated." });
         }
+
 
         // DELETE: api/category/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCategory(int id)
+        public async Task<ActionResult<object>> DeleteCategory(int id)
         {
+            // Validate the ID
+            if (id <= 0)
+            {
+                return BadRequest(new { message = "Invalid category ID." });
+            }
+
             var category = await _context.Categories.FindAsync(id);
+
+            // If the category does not exist, return a 404 response
             if (category == null)
             {
-                return NotFound();
+                return NotFound(new { message = $"Category with ID {id} not found." });
             }
 
             _context.Categories.Remove(category);
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            // Return a JSON response after successful deletion
+            return Ok(new { message = $"Category with ID {id} has been successfully deleted." });
         }
+
     }
 }

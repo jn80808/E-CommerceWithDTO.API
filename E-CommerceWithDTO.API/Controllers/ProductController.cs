@@ -64,8 +64,33 @@ namespace E_Commerce.API.Controllers
 
         // POST: api/product
         [HttpPost]
-        public async Task<ActionResult<ProductDto>> CreateProduct(CreateProductDto createProductDto)
+        public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductDto createProductDto)
         {
+            // Validate request body
+            if (createProductDto == null)
+            {
+                return BadRequest(new { message = "Invalid request. Product data is required." });
+            }
+
+            // Validate price and stock quantity
+            if (createProductDto.Price < 0)
+            {
+                return BadRequest(new { message = "Price must be a non-negative value." });
+            }
+
+            if (createProductDto.StockQuantity < 0)
+            {
+                return BadRequest(new { message = "Stock quantity must be a non-negative value." });
+            }
+
+            // Ensure the product does not already exist
+            bool productExists = await _context.Products.AnyAsync(p => p.Name == createProductDto.Name);
+            if (productExists)
+            {
+                return BadRequest(new { message = "Product already exists. Please use the update API instead." });
+            }
+
+            // Create new product
             var product = new Product
             {
                 Name = createProductDto.Name,
@@ -77,6 +102,7 @@ namespace E_Commerce.API.Controllers
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
+            // Prepare DTO for response
             var productDto = new ProductDto
             {
                 Id = product.Id,
@@ -93,37 +119,87 @@ namespace E_Commerce.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, UpdateProductDto updateProductDto)
         {
+            // Validate that the ID in the URL matches the ID in the body (if included)
+            if (updateProductDto.Id != 0 && updateProductDto.Id != id)
+            {
+                return BadRequest(new { message = "The product ID in the URL does not match the product ID in the request body." });
+            }
+
             var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
-                return NotFound();
+                return NotFound(new { message = "Product not found." });
             }
 
+            // Validate non-negative price and stock quantity
+            if (updateProductDto.Price < 0)
+            {
+                return BadRequest(new { message = "Price must be a non-negative value." });
+            }
+
+            //if (updateProductDto.StockQuantity < 0)
+            //{
+            //    return BadRequest(new { message = "Stock quantity must be a non-negative value." });
+            //}
+
+            // Ensure product name is unique (excluding itself)
+            bool isDuplicateName = await _context.Products.AnyAsync(p => p.Name == updateProductDto.Name && p.Id != id);
+            if (isDuplicateName)
+            {
+                return BadRequest(new { message = "A product with this name already exists. Please choose a different name." });
+            }
+
+            // Update product details
             product.Name = updateProductDto.Name;
             product.Description = updateProductDto.Description;
             product.Price = updateProductDto.Price;
             product.StockQuantity = updateProductDto.StockQuantity;
 
-            _context.Entry(product).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Entry(product).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { message = "Conflict detected while updating the product. Please try again." });
+            }
 
-            return NoContent();
+            return Ok(new ProductDto
+            {
+                Id = product.Id,
+                Name = product.Name,
+                Description = product.Description,
+                Price = product.Price,
+                StockQuantity = product.StockQuantity
+            });
         }
+
 
         // DELETE: api/product/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteProduct(int id)
+        public async Task<ActionResult<object>> DeleteProduct(int id)
         {
+            // Check if the provided ID is valid
+            if (id <= 0)
+            {
+                return BadRequest(new { message = "Invalid product ID." });
+            }
+
             var product = await _context.Products.FindAsync(id);
+
+            // If the product is not found, return a 404 response
             if (product == null)
             {
-                return NotFound();
+                return NotFound(new { message = $"Product with ID {id} not found." });
             }
 
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            // Return a JSON response after successful deletion
+            return Ok(new { message = $"Product with ID {id} has been successfully deleted." });
         }
+
     }
 }

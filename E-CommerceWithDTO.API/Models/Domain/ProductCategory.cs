@@ -14,8 +14,6 @@ namespace E_Commerce.API.Models.Domain
 
         public Category Category { get; set; }
 
-
-
     }
 
 }

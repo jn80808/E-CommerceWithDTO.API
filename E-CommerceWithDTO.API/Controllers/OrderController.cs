@@ -77,61 +77,82 @@ namespace E_Commerce.API.Controllers
             return Ok(orderDto);
         }
 
+
         // POST: api/order
         [HttpPost]
-        public async Task<ActionResult<OrderDto>> CreateOrder(CreateOrderDto createOrderDto)
+        public async Task<ActionResult<OrderDto>> CreateOrder([FromBody] CreateOrderDto createOrderDto)
         {
-            var order = new Order
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
             {
-                CustomerName = createOrderDto.CustomerName,
-                OrderDate = DateTime.UtcNow,
-                OrderItems = createOrderDto.OrderItems.Select(oi => new OrderItem
+                var order = new Order
                 {
-                    ProductId = oi.ProductId,
-                    Quantity = oi.Quantity,
-                    UnitPrice = oi.UnitPrice
-                }).ToList()
-            };
+                    CustomerName = createOrderDto.CustomerName,
+                    OrderDate = DateTime.UtcNow,
+                    OrderItems = createOrderDto.OrderItems.Select(oi => new OrderItem
+                    {
+                        ProductId = oi.ProductId,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice
+                    }).ToList()
+                };
 
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
 
-            var orderDto = new OrderDto
+                await transaction.CommitAsync();
+
+                var orderDto = new OrderDto
+                {
+                    Id = order.Id,
+                    CustomerName = order.CustomerName,
+                    OrderDate = order.OrderDate,
+                    OrderItems = order.OrderItems.Select(oi => new OrderItemDto
+                    {
+                        Id = oi.Id,
+                        OrderId = oi.OrderId,
+                        ProductId = oi.ProductId,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice
+                    }).ToList()
+                };
+
+                return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, orderDto);
+            }
+            catch (Exception)
             {
-                Id = order.Id,
-                CustomerName = order.CustomerName,
-                OrderDate = order.OrderDate,
-                OrderItems = order.OrderItems.Select(oi => new OrderItemDto
-                {
-                    Id = oi.Id,
-                    OrderId = oi.OrderId,
-                    ProductId = oi.ProductId,
-                    Quantity = oi.Quantity,
-                    UnitPrice = oi.UnitPrice
-                }).ToList()
-            };
-
-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, orderDto);
+                await transaction.RollbackAsync();
+                return StatusCode(500, "An error occurred while creating the order.");
+            }
         }
 
-        // PUT: api/order/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateOrder(int id, UpdateOrderDto updateOrderDto)
+        public async Task<IActionResult> UpdateOrder(int id, [FromBody] UpdateOrderDto updateOrderDto)
         {
+            // Validate ID consistency
+            if (updateOrderDto.Id != 0 && updateOrderDto.Id != id)
+            {
+                return BadRequest("The order ID in the URL does not match the order ID in the request body.");
+            }
+
             var order = await _context.Orders.FindAsync(id);
             if (order == null)
             {
                 return NotFound();
             }
 
-            // Manually update properties
             order.CustomerName = updateOrderDto.CustomerName;
 
             _context.Entry(order).State = EntityState.Modified;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { id = order.Id, customerName = order.CustomerName });
         }
+
+
 
         // DELETE: api/order/5
         [HttpDelete("{id}")]
@@ -146,7 +167,7 @@ namespace E_Commerce.API.Controllers
             _context.Orders.Remove(order);
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { message = "Order deleted successfully." });
         }
     }
 }

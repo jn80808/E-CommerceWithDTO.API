@@ -58,11 +58,18 @@ namespace E_Commerce.API.Controllers
 
             return Ok(orderItemDto);
         }
-
         // POST: api/orderitem
         [HttpPost]
-        public async Task<ActionResult<OrderItemDto>> CreateOrderItem(CreateOrderItemDto createOrderItemDto)
+        public async Task<ActionResult<OrderItemDto>> CreateOrderItem([FromBody] CreateOrderItemDto createOrderItemDto)
         {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var order = await _context.Orders.FindAsync(createOrderItemDto.OrderId);
+            if (order == null) return BadRequest("Invalid OrderId.");
+
+            var product = await _context.Products.FindAsync(createOrderItemDto.ProductId);
+            if (product == null) return BadRequest("Invalid ProductId.");
+
             var orderItem = new OrderItem
             {
                 OrderId = createOrderItemDto.OrderId,
@@ -88,15 +95,13 @@ namespace E_Commerce.API.Controllers
 
         // PUT: api/orderitem/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateOrderItem(int id, UpdateOrderItemDto updateOrderItemDto)
+        public async Task<IActionResult> UpdateOrderItem(int id, [FromBody] UpdateOrderItemDto updateOrderItemDto)
         {
-            var orderItem = await _context.OrderItems.FindAsync(id);
-            if (orderItem == null)
-            {
-                return NotFound();
-            }
+            if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            // Manually update properties
+            var orderItem = await _context.OrderItems.FindAsync(id);
+            if (orderItem == null) return NotFound();
+
             orderItem.Quantity = updateOrderItemDto.Quantity;
             orderItem.UnitPrice = updateOrderItemDto.UnitPrice;
 
@@ -105,9 +110,10 @@ namespace E_Commerce.API.Controllers
 
             return NoContent();
         }
+    
 
-        // DELETE: api/orderitem/5
-        [HttpDelete("{id}")]
+    // DELETE: api/orderitem/5
+    [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteOrderItem(int id)
         {
             var orderItem = await _context.OrderItems.FindAsync(id);

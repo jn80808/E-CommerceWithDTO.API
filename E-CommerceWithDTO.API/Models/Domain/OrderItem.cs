@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace E_Commerce.API.Models.Domain
 {
@@ -12,11 +13,14 @@ namespace E_Commerce.API.Models.Domain
         [ForeignKey("Order")]  // Reference to the navigation property (Order)
         public int OrderId { get; set; }
 
-        public Order Order { get; set; } //navigation property
+        [JsonIgnore]
+        public Order? Order { get; set; } //navigation property
 
         [ForeignKey("Product")]
         public int ProductId { get; set; }
-        public Product Product { get; set; }
+
+        [JsonIgnore]
+        public Product? Product { get; set; }
 
         public int Quantity { get; set; }
 
